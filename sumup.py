@@ -17,7 +17,7 @@ def get_all_equity_symbols(nse: NSE) -> list[str]:
     for days_back in [0, 1, 2, 3, 4, 5]:
         try:
             target_date = datetime.now() - timedelta(days=days_back)
-            path = nse.equityBhavcopy(target_date)
+            path = nse.equity_bhavcopy(target_date)
             df = pd.read_csv(path)
             # Filter for equity series (EQ) and stock type (STK)
             eq = df[(df['SctySrs'] == 'EQ') & (df['FinInstrmTp'] == 'STK')]
@@ -78,7 +78,7 @@ wb.close()
 # Load stocks from apinse.py (fallback list)
 with open('apinse.py', 'r') as f:
     content = f.read()
-match = re.search(r'stocks \+= \[(.*?)\]', content, re.DOTALL)
+match = re.search(r'stocks\s*[+=]\s*\[(.*?)\]', content, re.DOTALL)
 apinse_stocks = re.findall(r'"([^"]+)"', match.group(1)) if match else []
 
 nse_set = set(nse_stocks)
@@ -138,7 +138,7 @@ print(f"Stcapmark.xlsx saved. Total rows: {ws.max_row}")
 with open('apinse.py', 'r') as f:
     content = f.read()
 
-match = re.search(r'stocks \+= \[(.*?)\]', content, re.DOTALL)
+match = re.search(r'stocks\s*[+=]\s*\[(.*?)\]', content, re.DOTALL)
 if not match:
     print("Could not find stocks list in apinse.py")
     exit(1)
@@ -189,7 +189,7 @@ print(f"RELIANCE in Stcapmark.xlsx: {'RELIANCE' in stcap_stocks}")
 # Verify apinse.py
 with open('apinse.py', 'r') as f:
     content = f.read()
-match = re.search(r'stocks \+= \[(.*?)\]', content, re.DOTALL)
+match = re.search(r'stocks\s*[+=]\s*\[(.*?)\]', content, re.DOTALL)
 sym_list = re.findall(r'"([^"]+)"', match.group(1))
 print(f"apinse.py total stocks: {len(sym_list)}")
 print(f"20MICRONS in apinse.py: {'20MICRONS' in sym_list}")
@@ -209,3 +209,109 @@ still_missing_apeinse = nse_set - sym_set
 
 print(f"\nStill missing from Stcapmark.xlsx: {len(still_missing_stcap)}")
 print(f"Still missing from apinse.py: {len(still_missing_apeinse)}")
+
+
+# Split stocks list into chunks across apinse*.py files
+def split_stocks_into_files(full_stocks: list[str]):
+    """Split full stocks list into chunks and create apinse*.py files."""
+    import shutil
+    import re
+    
+    # Read apinse.py as template
+    with open('apinse.py', 'r') as f:
+        template = f.read()
+    
+    # Chunk sizes: split into groups of 500
+    chunk_size = 500
+    total_chunks = (len(full_stocks) + chunk_size - 1) // chunk_size
+    
+    for i in range(total_chunks):
+        start_idx = i * chunk_size
+        end_idx = min((i + 1) * chunk_size, len(full_stocks))
+        chunk = full_stocks[start_idx:end_idx]
+        
+        if i == 0:
+            filename = 'apinse.py'
+            var_name = 'stocks'
+        else:
+            filename = f'apinse{i}.py'
+            var_name = f'stocks{i}'
+            shutil.copy('apinse.py', filename)
+        
+        stocks_str = 'stocks = [\n' if i == 0 else f'{var_name} = [\n'
+        for j, s in enumerate(chunk):
+            if j < len(chunk) - 1:
+                stocks_str += f'    "{s}",\n'
+            else:
+                stocks_str += f'    "{s}",\n'
+        stocks_str += ']\n'
+        
+        with open(filename, 'r') as f:
+            content = f.read()
+        
+        if i == 0:
+            match = re.search(r'stocks\s*=\s*\[.*?\]\n', content, re.DOTALL)
+            if match:
+                content = content[:match.start()] + stocks_str + content[match.end():]
+        else:
+            match = re.search(r'stocks\s*=\s*\[.*?\]\n', content, re.DOTALL)
+            if match:
+                content = content[:match.start()] + stocks_str + content[match.end():]
+            content = re.sub(r'\bstocks\b(?!\d)', var_name, content)
+        
+        with open(filename, 'w') as f:
+            f.write(content)
+        
+        print(f"Created {filename} with {len(chunk)} stocks ({var_name})")
+
+
+try:
+    with open('nse_stocks.txt', 'r') as f:
+        full_stocks = [line.strip() for line in f if line.strip()]
+    if full_stocks:
+        print("\n" + "="*50)
+        print("Splitting stocks into apinse*.py files...")
+        split_stocks_into_files(full_stocks)
+        print("="*50)
+except Exception as e:
+    print(f"Error splitting stocks: {e}")
+
+
+# Run all apinse files and then a17.py
+import subprocess
+import sys
+import glob
+
+print("\n" + "="*50)
+print("Running all apinse files...")
+print("="*50)
+# Get all apinse*.py files in order
+apin_files = []
+# apinse.py first
+if os.path.exists("apinse.py"):
+    apin_files.append("apinse.py")
+# then apinse1.py, apinse2.py, ...
+i = 1
+while True:
+    fname = f"apinse{i}.py"
+    if os.path.exists(fname):
+        apin_files.append(fname)
+        i += 1
+    else:
+        break
+
+for script in apin_files:
+    print(f"\nRunning {script}...")
+    try:
+        subprocess.run([sys.executable, script], cwd="/workspaces/trmc")
+    except Exception as e:
+        print(f"Error running {script}: {e}")
+
+if os.path.exists("web.py"):
+    print("\\n" + "="*50)
+    print("Running web.py...")
+    print("="*50)
+    try:
+        subprocess.run([sys.executable, "web.py"], cwd="/workspaces/trmc")
+    except Exception as e:
+        print(f"Error running web.py: {e}")
