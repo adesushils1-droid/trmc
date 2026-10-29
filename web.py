@@ -997,7 +997,15 @@ html_content = f"""<!DOCTYPE html>
         </div>
         <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap;">
           <label for="marketcapCandleStockSelect" style="font-weight: 700; color: var(--primary); font-size: 0.95rem;">Select Stock:</label>
-          <select id="marketcapCandleStockSelect" onchange="drawMarketcapCandle(); updateMarketcapCandleActionButtons()" style="padding: 12px 16px; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 14px; background: #f8fafc; min-width: 220px;"></select>
+          <input type="text" id="marketcapCandleStockSelect" list="marketcapCandleStockSuggestions" oninput="filterMarketcapCandleSuggestions(this.value)" onchange="drawMarketcapCandle(); updateMarketcapCandleActionButtons()" placeholder="Type stock name..." autocomplete="off" style="padding: 12px 16px; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 14px; background: #f8fafc; min-width: 220px;">
+          <datalist id="marketcapCandleStockSuggestions"></datalist>
+          <button onclick="openTradingViewFromCandle()" id="marketcapCandleViewTVBtn" style="padding: 10px 18px; background: linear-gradient(135deg, #2962FF 0%, #1E53E5 100%); color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(41, 98, 255, 0.25);">
+            <i class="fas fa-chart-line"></i> View on TradingView
+          </button>
+          <button onclick="openCandleStockAnalysis()" id="marketcapCandleDetailsBtn" style="padding: 10px 18px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.25);">
+            <i class="fas fa-info-circle"></i> Show Details
+          </button>
+        </div>
         </div>
         <div id="marketcapCandleTooltip" class="rank-tooltip" style="display: none;"></div>
         <div style="position: relative; height: 480px;">
@@ -1047,7 +1055,8 @@ html_content = f"""<!DOCTYPE html>
       
       <div class="controls" style="margin-bottom: 20px; padding: 20px; background: white; border-radius: 14px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); border: 1px solid rgba(0,0,0,0.04);">
         <label for="stockSelect" style="font-weight: 700; color: var(--primary); margin-right: 12px; font-size: 0.95rem;">Select Stock:</label>
-        <select id="stockSelect" onchange="const d=getStockAnalysisDuration();updateChart(d?d.start:'',d?d.end:'');" style="padding: 12px 16px; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 14px; background: #f8fafc; transition: all 0.3s; min-width: 200px;"></select>
+        <input type="text" id="stockSelect" list="stockSuggestions" onchange="const d=getStockAnalysisDuration();updateChart(d?d.start:'',d?d.end:'');" placeholder="Type stock name..." autocomplete="off" style="padding: 12px 16px; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 14px; background: #f8fafc; transition: all 0.3s; min-width: 200px;">
+        <datalist id="stockSuggestions"></datalist>
         <button onclick="openTradingView()" style="margin-left: 15px; padding: 12px 20px; background: linear-gradient(135deg, #2962FF 0%, #1E53E5 100%); color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 14px; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 15px rgba(41, 98, 255, 0.3); transition: all 0.3s;">
           <i class="fas fa-chart-line"></i> View on TradingView
         </button>
@@ -1236,7 +1245,7 @@ function openTab(evt, tabName) {{
       scrollArea.style.overflowY = '';
     }}
     const candleContainer = document.getElementById('marketcapCandleChartContainer');
-    if (candleContainer) candleContainer.style.display = 'none';
+    if (candleContainer) {{ candleContainer.style.display = 'none'; const cc = document.getElementById('marketcapCandleChart'); if (cc) cc.innerHTML = ''; }}
      const tableContainer = document.getElementById('marketTableContainer');
      if (tableContainer) tableContainer.style.display = 'none';
      hideSecondaryButtons();
@@ -1277,7 +1286,7 @@ function openTabFromMenu(evt, tabName) {{
       scrollArea.style.overflowY = '';
     }}
     const candleContainer = document.getElementById('marketcapCandleChartContainer');
-    if (candleContainer) candleContainer.style.display = 'none';
+    if (candleContainer) {{ candleContainer.style.display = 'none'; const cc = document.getElementById('marketcapCandleChart'); if (cc) cc.innerHTML = ''; }}
      const tableContainer = document.getElementById('marketTableContainer');
      if (tableContainer) tableContainer.style.display = 'none';
      hideSecondaryButtons();
@@ -1427,6 +1436,8 @@ function showAll() {{
   document.getElementById('searchInput').value = '';
   const tableContainer = document.getElementById('marketTableContainer');
   if (tableContainer) tableContainer.style.display = '';
+  const candleContainer = document.getElementById('marketcapCandleChartContainer');
+  if (candleContainer) candleContainer.style.display = 'none';
   const parent = document.getElementById('marketTable').parentNode;
   parent.removeChild(document.getElementById('marketTable'));
   const clone = originalTable.cloneNode(true);
@@ -1606,6 +1617,8 @@ function searchStock() {{
   const searchTerm = document.getElementById('searchInput').value.trim().toLowerCase();
   const table = document.getElementById('marketTable');
   const tableContainer = document.getElementById('marketTableContainer');
+  const candleContainer = document.getElementById('marketcapCandleChartContainer');
+  if (candleContainer) candleContainer.style.display = 'none';
   const headers = Array.from(table.querySelectorAll('th'));
   const rows = Array.from(table.querySelectorAll('tbody tr'));
 
@@ -1991,54 +2004,81 @@ function showMarketcapCandle(stockName) {{
   const tableContainer = document.getElementById('marketTableContainer');
   if (tableContainer) tableContainer.style.display = 'none';
 
-  // Populate stock dropdown
-  populateMarketcapCandleDropdown(stockName);
-
-  // Draw candlestick for first stock
-  setTimeout(drawMarketcapCandle, 200);
+  const sel2 = document.getElementById('marketcapCandleStockSelect');
+  if (sel2) {{
+    var candStock = sel2.value;
+    if (!candStock && selectedStock) candStock = selectedStock;
+    if (!candStock) candStock = 'RELIANCE';
+    sel2.value = candStock;
+  }}
+  var defStock2 = sel2 ? sel2.value : (selectedStock ? selectedStock : 'RELIANCE');
+  populateMarketcapCandleDropdown(defStock2);
+  drawMarketcapCandle();
 }}
 
 function populateMarketcapCandleDropdown(selectedStock) {{
   const table = document.getElementById('marketTable');
   if (!table) return;
   const rows = Array.from(table.querySelectorAll('tbody tr'));
-  const select = document.getElementById('marketcapCandleStockSelect');
-  if (!select) return;
-  const currentStock = selectedStock || select.value;
-  select.innerHTML = '';
+  const input = document.getElementById('marketcapCandleStockSelect');
+  const datalist = document.getElementById('marketcapCandleStockSuggestions');
+  if (!input) return;
+  const currentStock = selectedStock || input.value || 'RELIANCE';
+  if (datalist) datalist.innerHTML = '';
+  const seen = new Set();
   rows.forEach(row => {{
     const nameCell = row.cells[0];
     if (nameCell) {{
-      const opt = document.createElement('option');
-      opt.value = nameCell.textContent.trim();
-      opt.textContent = nameCell.textContent.trim();
-      select.appendChild(opt);
+      const name = nameCell.textContent.trim();
+      if (name && !seen.has(name)) {{
+        seen.add(name);
+        if (datalist) {{
+          const opt = document.createElement('option');
+          opt.value = name;
+          datalist.appendChild(opt);
+        }}
+      }}
     }}
   }});
-  if (currentStock && Array.from(select.options).some(option => option.value === currentStock)) {{
-    select.value = currentStock;
+  if (seen.has(currentStock)) {{
+    input.value = currentStock;
+  }} else if (seen.has('RELIANCE')) {{
+    input.value = 'RELIANCE';
+  }} else if (seen.size > 0) {{
+    input.value = Array.from(seen)[0];
   }}
   updateMarketcapCandleActionButtons();
 }}
 
-function updateMarketcapCandleActionButtons() {{
-  const select = document.getElementById('marketcapCandleStockSelect');
-  const viewButton = document.getElementById('marketcapViewTradingViewBtn');
-  const moreButton = document.getElementById('marketcapMoreInfoBtn');
-  const hasStock = select && select.value;
-
-  if (viewButton) viewButton.style.display = hasStock ? 'inline-flex' : 'none';
-  if (moreButton) moreButton.style.display = hasStock ? 'inline-flex' : 'none';
+function filterMarketcapCandleSuggestions(val) {{
+  const input = document.getElementById('marketcapCandleStockSelect');
+  const dl = document.getElementById('marketcapCandleStockSuggestions');
+  if (!dl) return;
+  dl.innerHTML = '';
+  const table = document.getElementById('marketTable');
+  if (!table) return;
+  const rows = Array.from(table.querySelectorAll('tbody tr'));
+  const search = (val || '').trim().toUpperCase();
+  const seen = new Set();
+  rows.forEach(row => {{
+    const name = row.cells[0].textContent.trim();
+    if (!name) return;
+    if (search && name.toUpperCase().indexOf(search) === -1) return;
+    if (seen.has(name)) return;
+    seen.add(name);
+    const opt = document.createElement('option');
+    opt.value = name;
+    dl.appendChild(opt);
+  }});
 }}
-
 function hideMarketcapMoreInfo() {{
   const moreButton = document.getElementById('marketcapMoreInfoBtn');
   if (moreButton) moreButton.style.display = 'none';
 }}
 
 function openTradingViewFromCandle() {{
-  const select = document.getElementById('marketcapCandleStockSelect');
-  const stock = select ? select.value : '';
+  const input = document.getElementById('marketcapCandleStockSelect');
+  const stock = input ? input.value : '';
   if (!stock) {{
     alert('Please select a stock first.');
     return;
@@ -2086,7 +2126,7 @@ function openMarketcapGraph() {{
 
 function getMarketcapCandleData(stockName) {{
   const table = document.getElementById('marketTable');
-  if (!table) return {{ dates: [], data: [] }};
+  if (!table) return [];
   const headers = Array.from(table.querySelectorAll('th'));
   const rows = Array.from(table.querySelectorAll('tbody tr'));
   const lcHeaders = headers.map(h => h.textContent.trim().toLowerCase());
@@ -2166,10 +2206,14 @@ function groupByWeek(data) {{
 
 function drawMarketcapCandle() {{
   const select = document.getElementById('marketcapCandleStockSelect');
-  if (!select || !select.value) return;
+  if (!select) return;
+  if (!select.value) {{
+    select.value = 'RELIANCE';
+  }}
   const stockName = select.value;
-
+  filterMarketcapCandleSuggestions(stockName);
   const data = getMarketcapCandleData(stockName);
+  const table = document.getElementById('marketTable');
   const weeks = groupByWeek(data);
 
   // Build OHLC candlesticks
@@ -3086,17 +3130,26 @@ let stockChart;
 function loadStockList() {{
   const table = document.getElementById('marketTable');
   const rows = Array.from(table.querySelectorAll('tbody tr'));
-  const select = document.getElementById('stockSelect');
-  select.innerHTML = "";
+  const input = document.getElementById('stockSelect');
+  const datalist = document.getElementById('stockSuggestions');
+  if (!input) return;
+  input.value = "";
+  if (datalist) datalist.innerHTML = "";
+  const seen = new Set();
   rows.forEach(row => {{
     const stock = row.cells[0].textContent.trim();
-    if (stock) {{
-      const option = document.createElement('option');
-      option.value = stock;
-      option.textContent = stock;
-      select.appendChild(option);
+    if (stock && !seen.has(stock)) {{
+      seen.add(stock);
+      if (datalist) {{
+        const option = document.createElement('option');
+        option.value = stock;
+        datalist.appendChild(option);
+      }}
     }}
   }});
+  if (input && !input.value) {{
+    input.value = "RELIANCE";
+  }}
 }}
 
 let lastStockSource = 'historyRank';
@@ -3105,9 +3158,9 @@ function showStockDetails(stockName, sourceTab) {{
   if (sourceTab) {{
     lastStockSource = sourceTab;
   }}
-  const select = document.getElementById('stockSelect');
-  if (select) {{
-    select.value = stockName;
+  const input = document.getElementById('stockSelect');
+  if (input) {{
+    input.value = stockName || 'RELIANCE';
     const d = getStockAnalysisDuration();
     updateChart(d ? d.start : '', d ? d.end : '');
   }}
@@ -3130,6 +3183,10 @@ function showStockDetails(stockName, sourceTab) {{
 
 function updateChart(startDate, endDate) {{
   const stock = document.getElementById('stockSelect').value;
+  if (!stock) {{
+    document.getElementById('stockSelect').value = 'RELIANCE';
+  }}
+  const stockName = document.getElementById('stockSelect').value || 'RELIANCE';
   const table = document.getElementById('marketTable');
   const headerNodes = Array.from(table.querySelectorAll('th'));
   const headers = headerNodes.map(h => h.textContent.trim());
@@ -3641,13 +3698,30 @@ function showTopPerformers() {{
     return;
   }}
 
+  // Find the latest rank column
+  let rankColIndex = -1;
+  for (let i = headers.length - 1; i >= 1; i--) {{
+    const headerText = headers[i].textContent.trim().toLowerCase();
+    if (headerText.includes('rank')) {{
+      rankColIndex = i;
+      break;
+    }}
+  }}
+
+  if (rankColIndex === -1) {{
+    alert('No rank columns found!');
+    return;
+  }}
+
   // Collect stock data with delivery values
   const stockData = [];
   rows.forEach(row => {{
     const stockName = row.cells[0].textContent.trim();
     const deliveryText = row.cells[deliveryColIndex]?.textContent.trim().replace(/,/g, '').replace('%', '') || '';
     const delivery = parseFloat(deliveryText);
-    if (!isNaN(delivery) && delivery > 0) {{
+    const rankText = row.cells[rankColIndex]?.textContent.trim().replace(/[^0-9]/g, '') || '';
+    const rank = parseInt(rankText, 10);
+    if (!isNaN(delivery) && delivery > 0 && !isNaN(rank) && Math.floor(rank / 10) < 500) {{
       stockData.push({{ name: stockName, delivery: delivery }});
     }}
   }});
@@ -3695,9 +3769,24 @@ function showTopPerformersDuration(startDate, endDate) {{
     }}
   }});
 
+  // Find the latest rank column
+  let rankColIndex = -1;
+  for (let i = headers.length - 1; i >= 1; i--) {{
+    const headerText = headers[i].textContent.trim().toLowerCase();
+    if (headerText.includes('rank')) {{
+      rankColIndex = i;
+      break;
+    }}
+  }}
+
   const stockDeliveryCounts = [];
   rows.forEach(row => {{
     const stockName = row.cells[0].textContent.trim();
+    if (rankColIndex !== -1) {{
+      const rankText = row.cells[rankColIndex]?.textContent.trim().replace(/[^0-9]/g, '') || '';
+      const rank = parseInt(rankText, 10);
+      if (isNaN(rank) || Math.floor(rank / 10) >= 500) return;
+    }}
     let count = 0;
     allDeliveryIndices.forEach(colIndex => {{
       const colDate = deliveryDateMap[colIndex];
@@ -3901,7 +3990,7 @@ function showRankChanges() {{
 
     if (!isNaN(latestRank) && !isNaN(previousRank)) {{
       const change = previousRank - latestRank; // Positive means improvement
-      if (change >= 10) {{
+      if (change >= 10 && Math.floor(previousRank / 10) < 500 && Math.floor(latestRank / 10) < 500) {{
         stockData.push({{ name: stockName, previousRank: previousRank, latestRank: latestRank, change: change }});
       }}
     }}
@@ -4713,7 +4802,12 @@ function showMarketCapTrend() {{
 document.addEventListener('DOMContentLoaded', function() {{
   applyColorFormatting();
   loadStockList();
+  const stockInput = document.getElementById('stockSelect');
+  if (stockInput && !stockInput.value) {{
+    stockInput.value = 'RELIANCE';
+  }}
   updateChart('', '');
+  updateDashboardStats();
   updateDashboardStats();
   populateStockSuggestions();
   setDatePickerRanges();
