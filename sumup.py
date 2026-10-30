@@ -354,3 +354,16 @@ if os.path.exists("web.py"):
         subprocess.run([sys.executable, "web.py"], cwd="/workspaces/trmc")
     except Exception as e:
         print(f"Error running web.py: {e}")
+
+
+# Save results to GitHub
+print("\n" + "="*50)
+print("Saving to GitHub...")
+print("="*50)
+try:
+    subprocess.run(["git", "add", "-A"], cwd="/workspaces/trmc", check=True)
+    subprocess.run(["git", "commit", "-m", "Update stock data"], cwd="/workspaces/trmc")
+    subprocess.run(["git", "push"], cwd="/workspaces/trmc", check=True)
+    print("Pushed to GitHub.")
+except Exception as e:
+    print(f"Git save failed: {e}")
