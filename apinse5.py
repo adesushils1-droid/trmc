@@ -450,7 +450,7 @@ def main():
 
     # Sort and rank by market cap descending
     sorted_results = sorted(results, key=lambda x: x.get('element_int', 0) if x.get('element_int') else 0, reverse=True)
-    for i, item in enumerate(sorted_results, 1):
+    for i, item in enumerate(sorted_results, int(os.environ.get("RANK_OFFSET", "1"))):
         item['rank'] = i
 
     date = datetime.now().date().isoformat()

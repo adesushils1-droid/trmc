@@ -5,6 +5,7 @@ Handles NSE's session requirements automatically
 """
 
 import os
+import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -301,11 +302,49 @@ while True:
         break
 
 for script in apin_files:
-    print(f"\nRunning {script}...")
+    # determine starting rank from current max rank in db
+    offset = 1
     try:
-        subprocess.run([sys.executable, script], cwd="/workspaces/trmc")
+        conn = sqlite3.connect('stock_data.db')
+        cur = conn.cursor()
+        cur.execute("SELECT COALESCE(MAX(rank),0) FROM stock_market_cap")
+        offset = (cur.fetchone()[0] or 0) + 1
+        conn.close()
+    except Exception:
+        pass
+    env = dict(os.environ)
+    env["RANK_OFFSET"] = str(offset)
+    print(f"\nRunning {script} (rank offset {offset})...")
+    try:
+        subprocess.run([sys.executable, script], cwd="/workspaces/trmc", env=env)
     except Exception as e:
         print(f"Error running {script}: {e}")
+
+# Rank stocks in Stcapmark.xlsx by market cap (2nd column) into last rank column
+try:
+    import openpyxl
+    wb = openpyxl.load_workbook('Stcapmark.xlsx')
+    ws = wb.active
+    # market cap values from 2nd column (index 2)
+    rows = list(ws.iter_rows(min_row=2))
+    data = []
+    for r in rows:
+        val = r[1].value
+        try:
+            mc = float(val) if val is not None else 0.0
+        except (ValueError, TypeError):
+            mc = 0.0
+        data.append((r, mc))
+    # sort descending by market cap
+    data.sort(key=lambda x: x[1], reverse=True)
+    last_col = ws.max_column
+    for rank, (r, mc) in enumerate(data, start=1):
+        ws.cell(row=r[0].row, column=last_col, value=rank)
+    wb.save('Stcapmark.xlsx')
+    wb.close()
+    print("Ranked Stcapmark.xlsx by market cap into last column.")
+except Exception as e:
+    print(f"Error ranking Stcapmark.xlsx: {e}")
 
 if os.path.exists("web.py"):
     print("\\n" + "="*50)
