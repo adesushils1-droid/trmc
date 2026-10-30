@@ -325,11 +325,11 @@ try:
     import openpyxl
     wb = openpyxl.load_workbook('Stcapmark.xlsx')
     ws = wb.active
-    # market cap values from 2nd column (index 2)
+    # market cap values from 3rd-from-last column
     rows = list(ws.iter_rows(min_row=2))
     data = []
     for r in rows:
-        val = r[1].value
+        val = r[-3].value
         try:
             mc = float(val) if val is not None else 0.0
         except (ValueError, TypeError):
