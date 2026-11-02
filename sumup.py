@@ -149,6 +149,14 @@ print(f"Stcapmark.xlsx saved. Total rows: {ws.max_row}")
 with open('apinse.py', 'r') as f:
     content = f.read()
 
+# Remove ETF/beta/case/bees entries from existing list
+bad = ['ETF','BETA','CASE','BEES']
+def is_bad(sym):
+    return any(b in sym.upper() for b in bad)
+# Remove quoted entries containing bad words
+import re as _re
+content = _re.sub(r'\s*"[^"]*(?:' + '|'.join(bad) + r')[^"]*",?\n', '', content, flags=_re.IGNORECASE)
+
 match = re.search(r'stocks\s*[+=]\s*\[(.*?)\]', content, re.DOTALL)
 if not match:
     print("Could not find stocks list in apinse.py")
