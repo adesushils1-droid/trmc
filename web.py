@@ -3990,7 +3990,7 @@ function showRankChanges() {{
 
     if (!isNaN(latestRank) && !isNaN(previousRank)) {{
       const change = previousRank - latestRank; // Positive means improvement
-      if (change >= 10 && Math.floor(previousRank / 10) < 500 && Math.floor(latestRank / 10) < 500) {{
+      if (change >= 10 && previousRank < 500 && latestRank < 500) {{
         stockData.push({{ name: stockName, previousRank: previousRank, latestRank: latestRank, change: change }});
       }}
     }}
