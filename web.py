@@ -4006,7 +4006,7 @@ function showRankChanges() {{
   const list = document.createElement('ol');
   topImprovers.forEach((stock, index) => {{
     const item = document.createElement('li');
-    item.innerHTML = `<strong>${{stock.name}}</strong> - Yesterday Rank: ${{Math.floor(stock.previousRank / 10)}}, Today Rank: ${{Math.floor(stock.latestRank / 10)}}`;
+    item.innerHTML = `<strong>${{stock.name}}</strong> - Yesterday Rank: ${{stock.previousRank}}, Today Rank: ${{stock.latestRank}}`;
     list.appendChild(item);
   }});
   infoPanel.appendChild(list);
