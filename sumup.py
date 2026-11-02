@@ -117,6 +117,16 @@ nse_set = set(nse_stocks)
 wb = openpyxl.load_workbook('Stcapmark.xlsx')
 ws = wb.active
 
+# Remove ETF/beta/case/bees stocks from existing rows
+bad = ['ETF','BETA','CASE','BEES']
+rows_to_delete = []
+for row in range(2, ws.max_row + 1):
+    val = ws.cell(row=row, column=1).value
+    if val and any(b in str(val).upper() for b in bad):
+        rows_to_delete.append(row)
+for row in reversed(rows_to_delete):
+    ws.delete_rows(row, 1)
+
 # Collect existing stocks from column A
 existing_stocks = set()
 for row in range(2, ws.max_row + 1):
