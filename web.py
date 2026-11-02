@@ -4043,7 +4043,7 @@ function showHistoryRank() {{
   const dailyTop10Map = {{}};
   const dailyTop10Stocks = {{}};
   for (let i = 1; i < rankColumns.length; i++) {{
-    const prevCol = rankColumns[i - 1];
+    const prevCol = rankColumns[rankColumns.length - 4];
     const currCol = rankColumns[i];
     const stockData = [];
     rows.forEach(row => {{
@@ -4162,7 +4162,7 @@ function renderHistoryRankAllDates(startDate, endDate) {{
   }}
 
   for (let i = rankColumns.length - 1; i >= 1; i--) {{
-    const prevCol = rankColumns[i - 1];
+    const prevCol = rankColumns[rankColumns.length - 4];
     const currCol = rankColumns[i];
     const dateLabel = currCol.date;
     const top10 = dailyTop10Map[currCol.date] || [];
