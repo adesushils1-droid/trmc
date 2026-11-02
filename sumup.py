@@ -22,7 +22,7 @@ def get_all_equity_symbols(nse: NSE) -> list[str]:
             df = pd.read_csv(path)
             # Filter for equity series (EQ) and stock type (STK)
             eq = df[(df['SctySrs'] == 'EQ') & (df['FinInstrmTp'] == 'STK')]
-            symbols = [s for s in eq['TckrSymb'].tolist() if 'ETF' not in str(s).upper()]
+            symbols = [s for s in eq['TckrSymb'].tolist() if not any(x in str(s).upper() for x in ['ETF','BETA','CASE','BEES'])]
             if symbols:
                 print(f"Loaded {len(symbols)} equity symbols from bhavcopy ({target_date})")
                 # Clean up old bhavcopy file
