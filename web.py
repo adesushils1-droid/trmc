@@ -3721,7 +3721,7 @@ function showTopPerformers() {{
     const delivery = parseFloat(deliveryText);
     const rankText = row.cells[rankColIndex]?.textContent.trim().replace(/[^0-9]/g, '') || '';
     const rank = parseInt(rankText, 10);
-    if (!isNaN(delivery) && delivery > 0 && !isNaN(rank) && Math.floor(rank / 10) < 500) {{
+    if (!isNaN(delivery) && delivery > 0 && !isNaN(rank) && rank < 500) {{
       stockData.push({{ name: stockName, delivery: delivery }});
     }}
   }});
