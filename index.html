@@ -881,7 +881,7 @@
     <div class="stat-card">
       <div style="font-size: 1.8rem; margin-bottom: 8px; opacity: 0.9;"><i class="fas fa-clock"></i></div>
       <div class="stat-label">LAST UPDATED</div>
-      <div class="stat-value" id="lastUpdated">2026-10-30</div>
+      <div class="stat-value" id="lastUpdated">2026-11-02</div>
       <div class="stat-desc">Data freshness</div>
     </div>
   </div>
@@ -2480977,7 +2480977,7 @@ function showRankChanges() {
   const list = document.createElement('ol');
   topImprovers.forEach((stock, index) => {
     const item = document.createElement('li');
-    item.innerHTML = `<strong>${stock.name}</strong> - Yesterday Rank: ${Math.floor(stock.previousRank / 10)}, Today Rank: ${Math.floor(stock.latestRank / 10)}`;
+    item.innerHTML = `<strong>${stock.name}</strong> - Yesterday Rank: ${stock.previousRank}, Today Rank: ${stock.latestRank}`;
     list.appendChild(item);
   });
   infoPanel.appendChild(list);
