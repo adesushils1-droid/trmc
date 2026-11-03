@@ -6,14 +6,16 @@ import sys
 from datetime import date
 from pathlib import Path
 
-HOLIDAY_FILE = Path(__file__).parent / "nse_holidays_2026.json"
+HOLIDAY_FILE = Path(__file__).parent / "nse_holidays_upto_2040.json"
+FALLBACK_HOLIDAY_FILE = Path(__file__).parent / "nse_holidays_2026.json"
 
 
 def load_holidays():
-    if not HOLIDAY_FILE.exists():
-        print(f"Warning: {HOLIDAY_FILE} not found, assuming no holidays", file=sys.stderr)
+    holiday_file = HOLIDAY_FILE if HOLIDAY_FILE.exists() else FALLBACK_HOLIDAY_FILE
+    if not holiday_file.exists():
+        print(f"Warning: No holiday file found, assuming no holidays", file=sys.stderr)
         return []
-    with open(HOLIDAY_FILE) as f:
+    with open(holiday_file) as f:
         data = json.load(f)
     return data.get("holidays", [])
 

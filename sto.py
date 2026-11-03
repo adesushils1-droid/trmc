@@ -12,7 +12,7 @@ from pathlib import Path
 import pandas as pd
 from nse import NSE
 
-EXCLUDED = ("ETF", "BEES", "CASE", "NIFTY")
+EXCLUDED = ("ETF", "BEES", "CASE", "NIFTY", "BETA", "LIQUID","MIDCAP","NEXT","GOLD","SILVER")
 CHUNK_SIZE = 500
 
 
