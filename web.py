@@ -4053,7 +4053,7 @@ function showHistoryRank() {{
       const prevRank = parseInt(prevRankText, 10);
       const currRank = parseInt(currRankText, 10);
 
-      if (!isNaN(prevRank) && !isNaN(currRank) && prevRank > 0 && currRank > 0) {{
+      if (!isNaN(prevRank) && !isNaN(currRank) && prevRank > 0 && currRank > 0 && Math.floor(prevRank / 10) < 500) {{
         const improvement = prevRank - currRank;
         if (improvement > 0) {{
           stockData.push({{
