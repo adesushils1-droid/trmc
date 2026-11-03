@@ -3721,7 +3721,7 @@ function showTopPerformers() {{
     const delivery = parseFloat(deliveryText);
     const rankText = row.cells[rankColIndex]?.textContent.trim().replace(/[^0-9]/g, '') || '';
     const rank = parseInt(rankText, 10);
-    if (!isNaN(delivery) && delivery > 0 && !isNaN(rank) && rank < 500) {{
+    if (!isNaN(delivery) && delivery > 0 && !isNaN(rank) && Math.floor(rank / 10) < 500) {{
       stockData.push({{ name: stockName, delivery: delivery }});
     }}
   }});
@@ -3990,7 +3990,7 @@ function showRankChanges() {{
 
     if (!isNaN(latestRank) && !isNaN(previousRank)) {{
       const change = previousRank - latestRank; // Positive means improvement
-      if (change >= 10 && previousRank < 500 && latestRank < 500) {{
+      if (change >= 10 && Math.floor(previousRank / 10) < 500 && Math.floor(latestRank / 10) < 500) {{
         stockData.push({{ name: stockName, previousRank: previousRank, latestRank: latestRank, change: change }});
       }}
     }}
@@ -4006,7 +4006,7 @@ function showRankChanges() {{
   const list = document.createElement('ol');
   topImprovers.forEach((stock, index) => {{
     const item = document.createElement('li');
-    item.innerHTML = `<strong>${{stock.name}}</strong> - Yesterday Rank: ${{stock.previousRank}}, Today Rank: ${{stock.latestRank}}`;
+    item.innerHTML = `<strong>${{stock.name}}</strong> - Yesterday Rank: ${{Math.floor(stock.previousRank / 10)}}, Today Rank: ${{Math.floor(stock.latestRank / 10)}}`;
     list.appendChild(item);
   }});
   infoPanel.appendChild(list);
@@ -4043,7 +4043,7 @@ function showHistoryRank() {{
   const dailyTop10Map = {{}};
   const dailyTop10Stocks = {{}};
   for (let i = 1; i < rankColumns.length; i++) {{
-    const prevCol = rankColumns[rankColumns.length - 4];
+    const prevCol = rankColumns[i - 1];
     const currCol = rankColumns[i];
     const stockData = [];
     rows.forEach(row => {{
@@ -4053,7 +4053,7 @@ function showHistoryRank() {{
       const prevRank = parseInt(prevRankText, 10);
       const currRank = parseInt(currRankText, 10);
 
-      if (!isNaN(prevRank) && !isNaN(currRank) && prevRank > 0 && currRank > 0 && prevRank < 500) {{
+      if (!isNaN(prevRank) && !isNaN(currRank) && prevRank > 0 && currRank > 0) {{
         const improvement = prevRank - currRank;
         if (improvement > 0) {{
           stockData.push({{
@@ -4162,7 +4162,7 @@ function renderHistoryRankAllDates(startDate, endDate) {{
   }}
 
   for (let i = rankColumns.length - 1; i >= 1; i--) {{
-    const prevCol = rankColumns[rankColumns.length - 4];
+    const prevCol = rankColumns[i - 1];
     const currCol = rankColumns[i];
     const dateLabel = currCol.date;
     const top10 = dailyTop10Map[currCol.date] || [];
@@ -4276,19 +4276,19 @@ function renderHistoryRankAllDates(startDate, endDate) {{
         tdAction.appendChild(showBtn);
 
         const tdPrev = document.createElement('td');
-        tdPrev.textContent = stock.prevRank;
+        tdPrev.textContent = stock.prevRank / 10;
         tdPrev.style.padding = '14px 16px';
         tdPrev.style.textAlign = 'center';
 
         const tdCurr = document.createElement('td');
-        tdCurr.textContent = stock.currRank;
+        tdCurr.textContent = stock.currRank / 10;
         tdCurr.style.padding = '14px 16px';
         tdCurr.style.color = 'var(--success)';
         tdCurr.style.fontWeight = '700';
         tdCurr.style.textAlign = 'center';
 
         const tdImprove = document.createElement('td');
-        tdImprove.textContent = '+' + stock.improvement;
+        tdImprove.textContent = '+' + (stock.improvement / 10);
         tdImprove.style.padding = '14px 16px';
         tdImprove.style.color = 'var(--success)';
         tdImprove.style.fontWeight = '700';
@@ -4586,19 +4586,19 @@ function renderHistoryRankForDate(selectedDate, startDate, endDate) {{
     tdAction.appendChild(showBtn);
 
     const tdPrev = document.createElement('td');
-    tdPrev.textContent = stock.prevRank;
+    tdPrev.textContent = stock.prevRank / 10;
     tdPrev.style.padding = '14px 16px';
     tdPrev.style.textAlign = 'center';
 
     const tdCurr = document.createElement('td');
-    tdCurr.textContent = stock.currRank;
+    tdCurr.textContent = stock.currRank / 10;
     tdCurr.style.padding = '14px 16px';
     tdCurr.style.color = 'var(--success)';
     tdCurr.style.fontWeight = '700';
     tdCurr.style.textAlign = 'center';
 
     const tdImprove = document.createElement('td');
-    tdImprove.textContent = '+' + stock.improvement;
+    tdImprove.textContent = '+' + (stock.improvement / 10);
     tdImprove.style.padding = '14px 16px';
     tdImprove.style.color = 'var(--success)';
     tdImprove.style.fontWeight = '700';
