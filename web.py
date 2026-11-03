@@ -3721,7 +3721,7 @@ function showTopPerformers() {{
     const delivery = parseFloat(deliveryText);
     const rankText = row.cells[rankColIndex]?.textContent.trim().replace(/[^0-9]/g, '') || '';
     const rank = parseInt(rankText, 10);
-    if (!isNaN(delivery) && delivery > 0 && !isNaN(rank) && Math.floor(rank / 10) < 500) {{
+    if (!isNaN(delivery) && delivery > 0 && isFinite(rank) && rank > 0 && Math.floor(rank / 10) < 500) {{
       stockData.push({{ name: stockName, delivery: delivery }});
     }}
   }});
@@ -3785,7 +3785,7 @@ function showTopPerformersDuration(startDate, endDate) {{
     if (rankColIndex !== -1) {{
       const rankText = row.cells[rankColIndex]?.textContent.trim().replace(/[^0-9]/g, '') || '';
       const rank = parseInt(rankText, 10);
-      if (isNaN(rank) || Math.floor(rank / 10) >= 500) return;
+      if (!isFinite(rank) || rank <= 0 || Math.floor(rank / 10) >= 500) return;
     }}
     let count = 0;
     allDeliveryIndices.forEach(colIndex => {{
