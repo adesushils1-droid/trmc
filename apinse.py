@@ -12,9 +12,6 @@ from typing import Any
 from nse import NSE
 from openpyxl import Workbook, load_workbook
 
-import sto
-sto.main()
-
 
 def load_stocks_from_files() -> list[str]:
     stocks = []
