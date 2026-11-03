@@ -5,7 +5,9 @@ Handles NSE's session requirements automatically
 
 from datetime import datetime
 import os
+import glob
 import sqlite3
+import time
 from pathlib import Path
 from typing import Any
 
@@ -249,13 +251,23 @@ def main():
     print("\nNSE Stock Data Fetcher - Multiple Stocks")
 
     results = []
+    files = sorted(glob.glob("nse_stocks*.txt"))
+    total_files = len(files)
+    print(f"Found {total_files} stock list file(s): {files}")
     with NSE(download_folder=Path.cwd(), server=False, timeout=20) as nse:
-        for symbol in stocks:
-            data = get_stock_data(nse, symbol)
-            if data:
-                element_int = int(data['market_cap'] / 10_000_000) if data['market_cap'] else 0
-                results.append({'stock': symbol, 'element_int': element_int, 'delivery': data['delivery_percentage']})
-                print(f"{symbol}: Market Cap = Rs {data['market_cap_cr']:,.2f} Cr, Delivery % = {data['delivery_percentage']:.2f}%")
+        for file_idx, f in enumerate(files):
+            with open(f) as fh:
+                symbols = [line.strip() for line in fh if line.strip()]
+            print(f"Processing {f} ({len(symbols)} stocks)...")
+            for symbol in symbols:
+                data = get_stock_data(nse, symbol)
+                if data:
+                    element_int = int(data['market_cap'] / 10_000_000) if data['market_cap'] else 0
+                    results.append({'stock': symbol, 'element_int': element_int, 'delivery': data['delivery_percentage']})
+                    print(f"{symbol}: Market Cap = Rs {data['market_cap_cr']:,.2f} Cr, Delivery % = {data['delivery_percentage']:.2f}%")
+            if file_idx < total_files - 1:
+                print("Resting 60s before next list...")
+                time.sleep(60)
 
     # Sort and rank by market cap descending
     sorted_results = sorted(results, key=lambda x: x.get('element_int', 0) if x.get('element_int') else 0, reverse=True)
