@@ -14,18 +14,19 @@ from typing import Any
 from nse import NSE
 from openpyxl import Workbook, load_workbook
 
+STOCKS_FILE = os.environ.get("STOCKS_FILE")  # e.g. "nse_stocks1.txt" for chunk mode; None = all
 
-def load_stocks_from_files() -> list[str]:
+
+def load_stocks_from_file(filename: str | None = None) -> list[str]:
     stocks = []
-    import glob
-    files = sorted(glob.glob("nse_stocks*.txt"))
+    files = [filename] if filename else sorted(glob.glob("nse_stocks*.txt"))
     for f in files:
         with open(f) as fh:
             stocks.extend([line.strip() for line in fh if line.strip()])
     return stocks
 
 
-stocks = load_stocks_from_files()
+stocks = load_stocks_from_file(STOCKS_FILE)
 
 
 def get_value(data: dict[str, Any], path: tuple[str, ...], default: Any = None) -> Any:
@@ -153,7 +154,7 @@ def display_stock(data: dict[str, Any]):
     print("=" * 70)
 
 
-def save_to_excel(sorted_results, date):
+def save_to_excel(sorted_results, date, create_rank=True):
     stock_row = {}
 
     if os.path.exists('Stcapmark.xlsx'):
@@ -169,25 +170,30 @@ def save_to_excel(sorted_results, date):
                 next_row = ws.max_row + 1
                 ws.cell(row=next_row, column=1, value=stock)
                 stock_row[stock] = next_row
-        market_col = None
+        target_mc = f'{date} Market Cap'
+        target_dq = f'{date} Delivery Qty'
+        target_rank = f'{date} Rank'
+        market_col = delivery_col = rank_col = None
         col = 2
-        while ws.cell(row=1, column=col).value is not None:
-            if ws.cell(row=1, column=col).value == f'{date} Market Cap':
+        while col <= ws.max_column:
+            header = ws.cell(row=1, column=col).value
+            if header == target_mc:
                 market_col = col
-                delivery_col = col + 1
-                rank_col = col + 2
+                if col + 1 <= ws.max_column and ws.cell(row=1, column=col + 1).value == target_dq:
+                    delivery_col = col + 1
+                if create_rank and col + 2 <= ws.max_column and ws.cell(row=1, column=col + 2).value == target_rank:
+                    rank_col = col + 2
                 break
-            col += 3
+            col += 1
         if market_col is None:
-            col = 2
-            while ws.cell(row=1, column=col).value is not None:
-                col += 1
+            col = ws.max_column + 1 if ws.max_column >= 2 else 2
             market_col = col
             delivery_col = col + 1
-            rank_col = col + 2
-            ws.cell(row=1, column=market_col, value=f'{date} Market Cap')
-            ws.cell(row=1, column=delivery_col, value=f'{date} Delivery Qty')
-            ws.cell(row=1, column=rank_col, value=f'{date} Rank')
+            ws.cell(row=1, column=market_col, value=target_mc)
+            ws.cell(row=1, column=delivery_col, value=target_dq)
+            if create_rank:
+                rank_col = col + 2
+                ws.cell(row=1, column=rank_col, value=target_rank)
     else:
         wb = Workbook()
         ws = wb.active
@@ -197,10 +203,12 @@ def save_to_excel(sorted_results, date):
             stock_row[stock] = row
         market_col = 2
         delivery_col = 3
-        rank_col = 4
         ws.cell(row=1, column=market_col, value=f'{date} Market Cap')
         ws.cell(row=1, column=delivery_col, value=f'{date} Delivery Qty')
-        ws.cell(row=1, column=rank_col, value=f'{date} Rank')
+        rank_col = None
+        if create_rank:
+            rank_col = 4
+            ws.cell(row=1, column=rank_col, value=f'{date} Rank')
 
     for item in sorted_results:
         row = stock_row.get(item['stock'])
@@ -209,10 +217,11 @@ def save_to_excel(sorted_results, date):
                 ws.cell(row=row, column=market_col, value=item['element_int'])
             if 'delivery' in item:
                 ws.cell(row=row, column=delivery_col, value=item['delivery'])
-            ws.cell(row=row, column=rank_col, value=item['rank'])
+            if create_rank and rank_col and 'rank' in item:
+                ws.cell(row=row, column=rank_col, value=item['rank'])
 
     wb.save('Stcapmark.xlsx')
-    print(f"Data saved to Stcapmark.xlsx ({len(sorted_results)} stocks)")
+    print(f"Data saved to Stcapmark.xlsx ({len(sorted_results)} stocks, rank={'on' if create_rank else 'off'})")
 
 
 def save_to_database(sorted_results, date):
@@ -249,25 +258,21 @@ def save_to_database(sorted_results, date):
 
 def main():
     print("\nNSE Stock Data Fetcher - Multiple Stocks")
+    print(f"Stocks file: {STOCKS_FILE or 'all nse_stocks*.txt'} ({len(stocks)} symbols)")
+
+    create_rank = os.environ.get("CREATE_RANK", "1") == "1"
+    if STOCKS_FILE:
+        create_rank = False  # rank is created after the last chunk runs
+        print("Chunk mode: ranked column will be created after the last list runs.")
 
     results = []
-    files = sorted(glob.glob("nse_stocks*.txt"))
-    total_files = len(files)
-    print(f"Found {total_files} stock list file(s): {files}")
     with NSE(download_folder=Path.cwd(), server=False, timeout=20) as nse:
-        for file_idx, f in enumerate(files):
-            with open(f) as fh:
-                symbols = [line.strip() for line in fh if line.strip()]
-            print(f"Processing {f} ({len(symbols)} stocks)...")
-            for symbol in symbols:
-                data = get_stock_data(nse, symbol)
-                if data:
-                    element_int = int(data['market_cap'] / 10_000_000) if data['market_cap'] else 0
-                    results.append({'stock': symbol, 'element_int': element_int, 'delivery': data['delivery_percentage']})
-                    print(f"{symbol}: Market Cap = Rs {data['market_cap_cr']:,.2f} Cr, Delivery % = {data['delivery_percentage']:.2f}%")
-            if file_idx < total_files - 1:
-                print("Resting 60s before next list...")
-                time.sleep(60)
+        for symbol in stocks:
+            data = get_stock_data(nse, symbol)
+            if data:
+                element_int = int(data['market_cap'] / 10_000_000) if data['market_cap'] else 0
+                results.append({'stock': symbol, 'element_int': element_int, 'delivery': data['delivery_percentage']})
+                print(f"{symbol}: Market Cap = Rs {data['market_cap_cr']:,.2f} Cr, Delivery % = {data['delivery_percentage']:.2f}%")
 
     # Sort and rank by market cap descending
     sorted_results = sorted(results, key=lambda x: x.get('element_int', 0) if x.get('element_int') else 0, reverse=True)
@@ -277,7 +282,7 @@ def main():
     date = datetime.now().date().isoformat()
     
     # Save to Excel
-    save_to_excel(sorted_results, date)
+    save_to_excel(sorted_results, date, create_rank=create_rank)
     
     # Save to SQLite database
     save_to_database(sorted_results, date)

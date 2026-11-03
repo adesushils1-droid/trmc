@@ -7,6 +7,8 @@ Excludes symbols containing ETF, BEES, CASE, NIFTY.
 
 import os
 import time
+import glob
+import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -60,6 +62,30 @@ def save_chunks(symbols: list[str]) -> None:
             time.sleep(60)
 
     print(f"\nTotal files created: {total_chunks}")
+    create_apinse_copies(total_chunks)
+
+
+def create_apinse_copies(total_chunks: int) -> None:
+    """Create apinse1.py, apinse2.py, ... copies from apinse.py, each bound to one nse_stocksN.txt."""
+    try:
+        with open("apinse.py", "r") as f:
+            template = f.read()
+    except FileNotFoundError:
+        print("apinse.py not found; skipping apinseN.py copy creation.")
+        return
+
+    stock_file_line = 'STOCKS_FILE = os.environ.get("STOCKS_FILE")  # e.g. "nse_stocks1.txt" for chunk mode; None = all'
+    for i in range(1, total_chunks + 1):
+        filename = f"apinse{i}.py"
+        content = template.replace(
+            stock_file_line,
+            f'STOCKS_FILE = "nse_stocks{i}.txt"  # chunk mode: process only nse_stocks{i}.txt',
+        )
+        with open(filename, "w") as f:
+            f.write(content)
+        print(f"Created {filename} bound to nse_stocks{i}.txt")
+
+    print(f"Created {total_chunks} apinse*.py copies from apinse.py")
 
 
 def main():
