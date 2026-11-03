@@ -1,0 +1,295 @@
+"""
+NSE Stock Data Fetcher using NseIndiaApi
+Handles NSE's session requirements automatically
+"""
+
+from datetime import datetime
+import os
+import glob
+import sqlite3
+import time
+from pathlib import Path
+from typing import Any
+
+from nse import NSE
+from openpyxl import Workbook, load_workbook
+
+STOCKS_FILE = "nse_stocks6.txt"  # chunk mode: process only nse_stocks6.txt
+
+
+def load_stocks_from_file(filename: str | None = None) -> list[str]:
+    stocks = []
+    files = [filename] if filename else sorted(glob.glob("nse_stocks*.txt"))
+    for f in files:
+        with open(f) as fh:
+            stocks.extend([line.strip() for line in fh if line.strip()])
+    return stocks
+
+
+stocks = load_stocks_from_file(STOCKS_FILE)
+
+
+def get_value(data: dict[str, Any], path: tuple[str, ...], default: Any = None) -> Any:
+    current = data
+    for key in path:
+        if not isinstance(current, dict):
+            return default
+        current = current.get(key)
+        if current in (None, ""):
+            return default
+    return current
+
+
+def first_value(*values: Any, default: Any = None) -> Any:
+    for value in values:
+        if value not in (None, ""):
+            return value
+    return default
+
+
+def to_float(value: Any, default: float = 0.0) -> float:
+    try:
+        if value in (None, ""):
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def to_int(value: Any, default: int = 0) -> int:
+    try:
+        if value in (None, ""):
+            return default
+        return int(float(value))
+    except (TypeError, ValueError):
+        return default
+
+
+def fetch_quote(nse: NSE, symbol: str) -> dict[str, Any]:
+    if hasattr(nse, "quote"):
+        return nse.quote(symbol)
+    if hasattr(nse, "equityQuote"):
+        return nse.equityQuote(symbol)
+    if hasattr(nse, "equity_quote"):
+        return nse.equity_quote(symbol)
+    raise AttributeError("NSE object does not have quote(), equityQuote(), or equity_quote()")
+
+
+def get_stock_data(nse: NSE, symbol: str) -> dict[str, Any] | None:
+    try:
+        print(f"Fetching {symbol} data from NSE...")
+        quote = fetch_quote(nse, symbol)
+
+        if not quote:
+            print(f"NSE returned an empty response for {symbol}.")
+            return None
+
+        meta = quote.get("metaData", {})
+        trade = quote.get("tradeInfo", {})
+        sec = quote.get("secInfo", {})
+
+        last_price = to_float(
+            first_value(
+                trade.get("lastPrice"),
+                quote.get("lastPrice"),
+                meta.get("closePrice"),
+                meta.get("lastPrice"),
+                default=0,
+            )
+        )
+
+        change = to_float(meta.get("change", 0))
+        percentage_change = to_float(meta.get("pChange", 0))
+        market_cap = to_float(trade.get("totalMarketCap", 0))
+        volume_traded = to_int(first_value(trade.get("totalTradedVolume"), trade.get("quantitytraded")))
+        delivery_quantity = to_int(first_value(sec.get("deliveryQuantity"), trade.get("deliveryquantity")))
+        delivery_percentage = to_float(
+            first_value(
+                trade.get("deliveryToTradedQuantity"),
+                sec.get("deliveryTotradedQuantity"),
+                default=0,
+            )
+        )
+
+        return {
+            "symbol": symbol,
+            "company_name": meta.get("companyName", symbol),
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "last_price": last_price,
+            "change": change,
+            "percentage_change": percentage_change,
+            "market_cap": market_cap,
+            "market_cap_cr": round(market_cap / 10_000_000, 2) if market_cap else 0,
+            "volume_traded": volume_traded,
+            "delivery_quantity": delivery_quantity,
+            "delivery_percentage": delivery_percentage,
+            "open": to_float(meta.get("open", 0)),
+            "high": to_float(meta.get("dayHigh", 0)),
+            "low": to_float(meta.get("dayLow", 0)),
+            "previous_close": to_float(meta.get("previousClose", 0)),
+            "last_update_time": quote.get("lastUpdateTime"),
+        }
+
+    except Exception as e:
+        print(f"Error fetching {symbol}: {e}")
+        return None
+
+
+def display_stock(data: dict[str, Any]):
+    print("\n" + "=" * 70)
+    print(f"{data['company_name']} ({data['symbol']})")
+    print("=" * 70)
+    print(f"As on: {data['timestamp']} IST")
+    print("-" * 70)
+    print(f"Last Price: Rs {data['last_price']:,.2f}")
+    print(f"Change: {data['change']:+,.2f} ({data['percentage_change']:+.2f}%)")
+    print(f"Open: Rs {data['open']:,.2f}")
+    print(f"High: Rs {data['high']:,.2f}")
+    print(f"Low: Rs {data['low']:,.2f}")
+    print(f"Previous Close: Rs {data['previous_close']:,.2f}")
+    print(f"Market Cap: Rs {data['market_cap_cr']:,.2f} Cr")
+    print(f"Delivery %: {data['delivery_percentage']:.2f}%")
+    print(f"Volume: {data['volume_traded']:,} shares")
+    print(f"Last Update: {data.get('last_update_time') or data['timestamp']}")
+    print("=" * 70)
+
+
+def save_to_excel(sorted_results, date, create_rank=True):
+    stock_row = {}
+
+    if os.path.exists('Stcapmark.xlsx'):
+        wb = load_workbook('Stcapmark.xlsx')
+        ws = wb.active
+        for row in range(2, ws.max_row + 1):
+            stock = ws.cell(row=row, column=1).value
+            if stock:
+                stock_row[stock] = row
+        # Add missing stocks from the stocks list
+        for stock in stocks:
+            if stock not in stock_row:
+                next_row = ws.max_row + 1
+                ws.cell(row=next_row, column=1, value=stock)
+                stock_row[stock] = next_row
+        target_mc = f'{date} Market Cap'
+        target_dq = f'{date} Delivery Qty'
+        target_rank = f'{date} Rank'
+        market_col = delivery_col = rank_col = None
+        col = 2
+        while col <= ws.max_column:
+            header = ws.cell(row=1, column=col).value
+            if header == target_mc:
+                market_col = col
+                if col + 1 <= ws.max_column and ws.cell(row=1, column=col + 1).value == target_dq:
+                    delivery_col = col + 1
+                if create_rank and col + 2 <= ws.max_column and ws.cell(row=1, column=col + 2).value == target_rank:
+                    rank_col = col + 2
+                break
+            col += 1
+        if market_col is None:
+            col = ws.max_column + 1 if ws.max_column >= 2 else 2
+            market_col = col
+            delivery_col = col + 1
+            ws.cell(row=1, column=market_col, value=target_mc)
+            ws.cell(row=1, column=delivery_col, value=target_dq)
+            if create_rank:
+                rank_col = col + 2
+                ws.cell(row=1, column=rank_col, value=target_rank)
+    else:
+        wb = Workbook()
+        ws = wb.active
+        ws.cell(row=1, column=1, value='Stock Name')
+        for row, stock in enumerate(stocks, 2):
+            ws.cell(row=row, column=1, value=stock)
+            stock_row[stock] = row
+        market_col = 2
+        delivery_col = 3
+        ws.cell(row=1, column=market_col, value=f'{date} Market Cap')
+        ws.cell(row=1, column=delivery_col, value=f'{date} Delivery Qty')
+        rank_col = None
+        if create_rank:
+            rank_col = 4
+            ws.cell(row=1, column=rank_col, value=f'{date} Rank')
+
+    for item in sorted_results:
+        row = stock_row.get(item['stock'])
+        if row:
+            if 'element_int' in item:
+                ws.cell(row=row, column=market_col, value=item['element_int'])
+            if 'delivery' in item:
+                ws.cell(row=row, column=delivery_col, value=item['delivery'])
+            if create_rank and rank_col and 'rank' in item:
+                ws.cell(row=row, column=rank_col, value=item['rank'])
+
+    wb.save('Stcapmark.xlsx')
+    print(f"Data saved to Stcapmark.xlsx ({len(sorted_results)} stocks, rank={'on' if create_rank else 'off'})")
+
+
+def save_to_database(sorted_results, date):
+    db_path = 'stock_data.db'
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS stock_market_cap (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            stock TEXT NOT NULL,
+            market_cap INTEGER,
+            delivery_percentage REAL,
+            rank INTEGER,
+            date TEXT NOT NULL
+        )
+    ''')
+    
+    # Build a lookup from stock name to data
+    data_lookup = {item['stock']: item for item in sorted_results}
+    
+    # Save all stocks from the stocks list, even those without data
+    for stock in stocks:
+        item = data_lookup.get(stock, {'stock': stock, 'element_int': None, 'delivery': None, 'rank': None})
+        cursor.execute('''
+            INSERT OR REPLACE INTO stock_market_cap (stock, market_cap, delivery_percentage, rank, date)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (item['stock'], item.get('element_int'), item.get('delivery'), item.get('rank'), date))
+    
+    conn.commit()
+    conn.close()
+    print(f"Data saved to {db_path}")
+
+
+def main():
+    print("\nNSE Stock Data Fetcher - Multiple Stocks")
+    print(f"Stocks file: {STOCKS_FILE or 'all nse_stocks*.txt'} ({len(stocks)} symbols)")
+
+    create_rank = os.environ.get("CREATE_RANK", "1") == "1"
+    if STOCKS_FILE:
+        create_rank = False  # rank is created after the last chunk runs
+        print("Chunk mode: ranked column will be created after the last list runs.")
+
+    results = []
+    with NSE(download_folder=Path.cwd(), server=False, timeout=20) as nse:
+        for symbol in stocks:
+            data = get_stock_data(nse, symbol)
+            if data:
+                element_int = int(data['market_cap'] / 10_000_000) if data['market_cap'] else 0
+                results.append({'stock': symbol, 'element_int': element_int, 'delivery': data['delivery_percentage']})
+                print(f"{symbol}: Market Cap = Rs {data['market_cap_cr']:,.2f} Cr, Delivery % = {data['delivery_percentage']:.2f}%")
+
+    # Sort and rank by market cap descending
+    sorted_results = sorted(results, key=lambda x: x.get('element_int', 0) if x.get('element_int') else 0, reverse=True)
+    for i, item in enumerate(sorted_results, 1):
+        item['rank'] = i
+
+    date = datetime.now().date().isoformat()
+    
+    # Save to Excel
+    save_to_excel(sorted_results, date, create_rank=create_rank)
+    
+    # Save to SQLite database
+    save_to_database(sorted_results, date)
+
+    # Regenerate web dashboard
+    import web
+
+
+if __name__ == "__main__":
+    main()

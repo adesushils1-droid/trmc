@@ -59,7 +59,7 @@ def save_chunks(symbols: list[str]) -> None:
 
         if i < total_chunks - 1:
             print("Resting 60s before next list...")
-            time.sleep(60)
+            time.sleep(00)
 
     print(f"\nTotal files created: {total_chunks}")
     create_apinse_copies(total_chunks)
