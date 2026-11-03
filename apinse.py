@@ -273,6 +273,9 @@ def main():
     # Save to SQLite database
     save_to_database(sorted_results, date)
 
+    # Regenerate web dashboard
+    import web
+
 
 if __name__ == "__main__":
     main()
