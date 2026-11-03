@@ -6,6 +6,7 @@ Excludes symbols containing ETF, BEES, CASE, NIFTY.
 """
 
 import os
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -53,6 +54,10 @@ def save_chunks(symbols: list[str]) -> None:
                 f.write(f"{s}\n")
 
         print(f"Created {filename} with {len(chunk)} stocks ({start_idx + 1}-{end_idx})")
+
+        if i < total_chunks - 1:
+            print("Resting 60s before next list...")
+            time.sleep(60)
 
     print(f"\nTotal files created: {total_chunks}")
 
